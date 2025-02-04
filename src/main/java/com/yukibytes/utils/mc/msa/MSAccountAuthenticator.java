@@ -16,16 +16,16 @@ import java.util.concurrent.*;
  * 账户认证处理器 - 每个账户实例独立使用
  * Copyright (c) 2024 Deepseek-V3
  */
-public class AccountAuthenticator {
-    private final AuthConfig config;
-    private CompletableFuture<AccountData> authFuture;
+public class MSAccountAuthenticator {
+    private final MSAuthConfig config;
+    private CompletableFuture<MSAccountData> authFuture;
 
-    public AccountAuthenticator(AuthConfig config) {
+    public MSAccountAuthenticator(MSAuthConfig config) {
         this.config = config;
     }
 
     // 全新登录流程
-    public CompletableFuture<AccountData> authenticate() throws IOException {
+    public CompletableFuture<MSAccountData> authenticate() throws IOException {
         authFuture = new CompletableFuture<>();
         startCallbackServer();
         openAuthPage();
@@ -33,12 +33,12 @@ public class AccountAuthenticator {
     }
 
     // 通过refreshToken重新登录
-    public CompletableFuture<AccountData> refreshLogin(String refreshToken) {
-        CompletableFuture<AccountData> future = new CompletableFuture<>();
+    public CompletableFuture<MSAccountData> refreshLogin(String refreshToken) {
+        CompletableFuture<MSAccountData> future = new CompletableFuture<>();
 
         try {
             JSONObject tokenResponse = postRequest(
-                    AuthConfig.TOKEN_URL,
+                    MSAuthConfig.TOKEN_URL,
                     "client_id=" + config.getClientId() +
                             "&client_secret=" + config.getEncodedSecret() +
                             "&refresh_token=" + refreshToken +
@@ -54,13 +54,13 @@ public class AccountAuthenticator {
     }
 
     // 处理令牌响应
-    private void processTokenResponse(JSONObject tokenResponse, CompletableFuture<AccountData> future) {
+    private void processTokenResponse(JSONObject tokenResponse, CompletableFuture<MSAccountData> future) {
         try {
             // Xbox和Minecraft认证流程
             JSONObject xboxToken = authenticateXbox(tokenResponse.getString("access_token"));
             JSONObject xstsToken = authenticateXSTS(xboxToken.getString("Token"));
             JSONObject mcToken = authenticateMinecraft(xstsToken);
-            AccountData account = getProfileData(mcToken, tokenResponse);
+            MSAccountData account = getProfileData(mcToken, tokenResponse);
 
             future.complete(account);
         } catch (Exception e) {
@@ -70,7 +70,7 @@ public class AccountAuthenticator {
 
     // Xbox认证
     private JSONObject authenticateXbox(String msToken) throws IOException {
-        return postJsonRequest(AuthConfig.XBOX_AUTH_URL,
+        return postJsonRequest(MSAuthConfig.XBOX_AUTH_URL,
                 new JSONObject()
                         .put("Properties", new JSONObject()
                                 .put("AuthMethod", "RPS")
@@ -83,7 +83,7 @@ public class AccountAuthenticator {
 
     // XSTS认证
     private JSONObject authenticateXSTS(String xboxToken) throws IOException {
-        return postJsonRequest(AuthConfig.XSTS_AUTH_URL,
+        return postJsonRequest(MSAuthConfig.XSTS_AUTH_URL,
                 new JSONObject()
                         .put("Properties", new JSONObject()
                                 .put("SandboxId", "RETAIL")
@@ -100,20 +100,20 @@ public class AccountAuthenticator {
                 .getJSONObject(0)
                 .getString("uhs");
 
-        return postJsonRequest(AuthConfig.MINECRAFT_AUTH_URL,
+        return postJsonRequest(MSAuthConfig.MINECRAFT_AUTH_URL,
                 new JSONObject().put("identityToken", "XBL3.0 x=" + uhs + ";" + xstsToken.getString("Token")),
                 "Bearer");
     }
 
     // 获取玩家信息
-    private AccountData getProfileData(JSONObject mcToken, JSONObject msToken) throws IOException {
+    private MSAccountData getProfileData(JSONObject mcToken, JSONObject msToken) throws IOException {
         JSONObject profile = getRequest(
-                AuthConfig.PROFILE_URL,
+                MSAuthConfig.PROFILE_URL,
                 mcToken.getString("token_type") + " " + mcToken.getString("access_token")
         );
 
         String skinUrl = parseSkinUrl(profile);
-        return new AccountData(
+        return new MSAccountData(
                 profile.getString("name"),
                 profile.getString("id"),
                 mcToken.getString("access_token"),
@@ -213,7 +213,7 @@ public class AccountAuthenticator {
 
     // 打开认证页面
     private void openAuthPage() throws IOException {
-        String authUrl = AuthConfig.MICROSOFT_AUTH_URL + "?" +
+        String authUrl = MSAuthConfig.MICROSOFT_AUTH_URL + "?" +
                 "client_id=" + config.getClientId() +
                 "&response_type=code" +
                 "&redirect_uri=" + URLEncoder.encode(config.getRedirectUri(), StandardCharsets.UTF_8.name()) +
@@ -227,7 +227,7 @@ public class AccountAuthenticator {
     private void handleAuthCode(String code, HttpExchange exchange) {
         try {
             JSONObject tokenResponse = postRequest(
-                    AuthConfig.TOKEN_URL,
+                    MSAuthConfig.TOKEN_URL,
                     "client_id=" + config.getClientId() +
                             "&client_secret=" + config.getEncodedSecret() +
                             "&code=" + code +

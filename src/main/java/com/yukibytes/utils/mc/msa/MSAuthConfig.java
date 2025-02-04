@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
  * 微软认证配置类 - 存储全局常量
  * Copyright (c) 2024 Deepseek-V3
  */
-public class AuthConfig {
+public class MSAuthConfig {
     // 应用注册信息
     private final String clientId;
     private final String clientSecret;
@@ -22,7 +22,7 @@ public class AuthConfig {
     public static final String MINECRAFT_AUTH_URL = "https://api.minecraftservices.com/authentication/login_with_xbox";
     public static final String PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile";
 
-    public AuthConfig(String clientId, String clientSecret, int callbackPort) {
+    public MSAuthConfig(String clientId, String clientSecret, int callbackPort) {
         this.clientId = clientId;
         this.clientSecret = clientSecret;
         this.callbackPort = callbackPort;

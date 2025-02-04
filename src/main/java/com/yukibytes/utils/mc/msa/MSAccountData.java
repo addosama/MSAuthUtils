@@ -4,15 +4,15 @@ package com.yukibytes.utils.mc.msa;
  * 需要保存的账户数据
  * Copyright (c) 2024 Deepseek-V3
  */
-public class AccountData {
+public class MSAccountData {
  private final String username;
  private final String uuid;
  private final String accessToken;
  private String refreshToken; // 需要更新保存
  private final String skinUrl;
 
- public AccountData(String username, String uuid, String accessToken,
-                    String refreshToken, String skinUrl) {
+ public MSAccountData(String username, String uuid, String accessToken,
+                      String refreshToken, String skinUrl) {
   this.username = username;
   this.uuid = uuid;
   this.accessToken = accessToken;
