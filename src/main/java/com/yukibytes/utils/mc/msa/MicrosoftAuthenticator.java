@@ -117,11 +117,28 @@ public class MicrosoftAuthenticator {
                     mcToken.getString("token_type") + " " + mcToken.getString("access_token")
             );
 
+            String skinURL = null;
+            boolean classic = true;
+            if (profile.has("skins")) {
+                for (Object o : profile.getJSONArray("skins")) {
+                    JSONObject skin = (JSONObject) o;
+                    if (skin.has("state") && "ACTIVE".equals(skin.getString("state"))) {
+                        skinURL = skin.getString("url");
+                        break;
+                    }
+                    if (skin.has("variant")) {
+                        classic = "CLASSIC".equals(skin.getString("variant"));
+                    }
+                }
+            }
+
             MinecraftAccount account = new MinecraftAccount(
                     profile.getString("name"),
                     profile.getString("id"),
                     mcToken.getString("access_token"),
-                    tokenResponse.optString("refresh_token")
+                    tokenResponse.optString("refresh_token"),
+                    skinURL,
+                    classic
             );
 
             sendSuccessResponse(exchange);
