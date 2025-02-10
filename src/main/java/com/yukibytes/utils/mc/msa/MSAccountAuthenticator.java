@@ -1,7 +1,6 @@
 package com.yukibytes.utils.mc.msa;
 
-import com.sun.net.httpserver.HttpExchange;
-import com.sun.net.httpserver.HttpServer;
+import com.sun.net.httpserver.*;
 import org.json.JSONObject;
 
 import java.awt.*;
@@ -19,9 +18,13 @@ import java.util.concurrent.*;
 public class MSAccountAuthenticator {
     private final MSAuthConfig config;
     private CompletableFuture<MSAccountData> authFuture;
+    private final String codeVerifier;
+    private final String codeChallenge;
 
     public MSAccountAuthenticator(MSAuthConfig config) {
         this.config = config;
+        this.codeVerifier = PKCEUtils.generateCodeVerifier();
+        this.codeChallenge = PKCEUtils.generateCodeChallenge(codeVerifier);
     }
 
     // 全新登录流程
@@ -78,7 +81,7 @@ public class MSAccountAuthenticator {
                                 .put("RpsTicket", "d=" + msToken))
                         .put("RelyingParty", "http://auth.xboxlive.com")
                         .put("TokenType", "JWT"),
-                "XBL3.0 x=");
+                "XBL3.0 x=", "TokenType");
     }
 
     // XSTS认证
@@ -90,7 +93,7 @@ public class MSAccountAuthenticator {
                                 .put("UserTokens", new String[]{xboxToken}))
                         .put("RelyingParty", "rp://api.minecraftservices.com/")
                         .put("TokenType", "JWT"),
-                "XBL3.0 x=");
+                "XBL3.0 x=", "TokenType");
     }
 
     // Minecraft认证
@@ -102,7 +105,7 @@ public class MSAccountAuthenticator {
 
         return postJsonRequest(MSAuthConfig.MINECRAFT_AUTH_URL,
                 new JSONObject().put("identityToken", "XBL3.0 x=" + uhs + ";" + xstsToken.getString("Token")),
-                "Bearer");
+                "Bearer", "identityToken");
     }
 
     // 获取玩家信息
@@ -150,14 +153,14 @@ public class MSAccountAuthenticator {
     }
 
     // HTTP POST请求（JSON数据）
-    private JSONObject postJsonRequest(String url, JSONObject data, String authPrefix) throws IOException {
+    private JSONObject postJsonRequest(String url, JSONObject data, String authPrefix, String s) throws IOException {
         HttpURLConnection conn = (HttpURLConnection) new URL(url).openConnection();
         conn.setRequestMethod("POST");
         conn.setDoOutput(true);
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setRequestProperty("Accept", "application/json");
         if (authPrefix != null) {
-            conn.setRequestProperty("Authorization", authPrefix + data.getString("Token"));
+            conn.setRequestProperty("Authorization", authPrefix + data.getString(s));
         }
 
         try (OutputStream os = conn.getOutputStream()) {
@@ -182,9 +185,12 @@ public class MSAccountAuthenticator {
             BufferedReader reader = new BufferedReader(new InputStreamReader(is));
             StringBuilder response = new StringBuilder();
             String line;
+//            System.out.println("========================");
             while ((line = reader.readLine()) != null) {
                 response.append(line);
+//                System.out.println(line);
             }
+//            System.out.println("========================");
             JSONObject json = new JSONObject(response.toString());
             if (status >= 400) {
                 throw new IOException("HTTP Error " + status + ": " + json.optString("error", "Unknown error"));
@@ -195,14 +201,23 @@ public class MSAccountAuthenticator {
 
     // 启动回调服务器
     private void startCallbackServer() throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress(config.getCallbackPort()), 0);
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", config.getCallbackPort()), 0);
+
+//        System.out.println(server.getAddress().toString());
+//        System.out.println(server.getAddress().getHostName());
+//        System.out.println(server.getAddress().getHostString());
+
         server.createContext("/auth", exchange -> {
             try {
                 Map<String, String> params = parseQueryParams(exchange.getRequestURI().getQuery());
                 if (params.containsKey("code")) {
                     handleAuthCode(params.get("code"), exchange);
+                } else if (params.containsKey("error")) {
+                    String error = params.get("error");
+                    String errorDescription = params.get("error_description");
+                    System.err.println("LOGIN FAILED: " + error + " - " + errorDescription);
                 } else {
-                    sendErrorResponse(exchange, "Authentication failed");
+                    sendErrorResponse(exchange, "Authentication failed - Unknown Error");
                 }
             } finally {
                 server.stop(0);
@@ -216,8 +231,10 @@ public class MSAccountAuthenticator {
         String authUrl = MSAuthConfig.MICROSOFT_AUTH_URL + "?" +
                 "client_id=" + config.getClientId() +
                 "&response_type=code" +
-                "&redirect_uri=" + URLEncoder.encode(config.getRedirectUri(), StandardCharsets.UTF_8.name()) +
+                "&redirect_uri=" + config.getRedirectUri() +
                 "&scope=XboxLive.signin%20offline_access" +
+                "&code_challenge=" + codeChallenge +
+                "&code_challenge_method=S256" +
                 "&response_mode=query";
 
         Desktop.getDesktop().browse(URI.create(authUrl));
@@ -229,10 +246,11 @@ public class MSAccountAuthenticator {
             JSONObject tokenResponse = postRequest(
                     MSAuthConfig.TOKEN_URL,
                     "client_id=" + config.getClientId() +
-                            "&client_secret=" + config.getEncodedSecret() +
+                            //"&client_secret=" + config.getEncodedSecret() +
                             "&code=" + code +
+                            "&redirect_uri=" + config.getRedirectUri() +
                             "&grant_type=authorization_code" +
-                            "&redirect_uri=" + URLEncoder.encode(config.getRedirectUri(), StandardCharsets.UTF_8.name())
+                            "&code_verifier=" +codeVerifier
             );
 
             processTokenResponse(tokenResponse, authFuture);
@@ -267,7 +285,7 @@ public class MSAccountAuthenticator {
 
     // 发送成功响应
     private void sendSuccessResponse(HttpExchange exchange) throws IOException {
-        String response = "<h1>登录成功！可以关闭此窗口</h1>";
+        String response = "<h1>You can close this page now</h1>";
         exchange.sendResponseHeaders(200, response.getBytes().length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(response.getBytes());
@@ -276,7 +294,7 @@ public class MSAccountAuthenticator {
 
     // 发送错误响应
     private void sendErrorResponse(HttpExchange exchange, String error) throws IOException {
-        String response = "<h1>登录失败: " + error + "</h1>";
+        String response = "<h1>Login Failed: " + error + "</h1>";
         exchange.sendResponseHeaders(400, response.getBytes().length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(response.getBytes());

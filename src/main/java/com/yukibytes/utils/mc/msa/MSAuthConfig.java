@@ -30,14 +30,11 @@ public class MSAuthConfig {
 
     // Getter方法
     public String getClientId() { return clientId; }
-    public String getClientSecret() { return clientSecret; }
-    public String getRedirectUri() { return "http://localhost:" + callbackPort + "/auth"; }
+    public String getRedirectUri() {
+        return URLEncodeUtils.utf8("http://localhost:" + callbackPort + "/auth");
+    }
     public String getEncodedSecret() {
-        try {
-            return URLEncoder.encode(clientSecret, StandardCharsets.UTF_8.name());
-        } catch (UnsupportedEncodingException e) {
-            throw new RuntimeException(e);
-        }
+        return URLEncodeUtils.utf8(clientSecret);
     }
     public int getCallbackPort() {
         return callbackPort;
