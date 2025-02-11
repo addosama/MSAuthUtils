@@ -1,9 +1,10 @@
 plugins {
     id 'java'
+    id 'com.github.johnrengelman.shadow' version '7.1.2'
 }
 
 group = 'com.yukibytes.utils.mc.msa'
-version = '1.0'
+version = '1.1'
 
 repositories {
     mavenCentral()
@@ -14,6 +15,10 @@ dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter'
     // https://mvnrepository.com/artifact/org.json/json
     implementation 'org.json:json:20250107'
+}
+
+shadowJar {
+    archiveClassifier.set('all')
 }
 
 test {

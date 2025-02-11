@@ -235,7 +235,8 @@ public class MSAccountAuthenticator {
                 "&scope=XboxLive.signin%20offline_access" +
                 "&code_challenge=" + codeChallenge +
                 "&code_challenge_method=S256" +
-                "&response_mode=query";
+                "&response_mode=query" +
+                "&prompt=select_account";
 
         Desktop.getDesktop().browse(URI.create(authUrl));
     }
