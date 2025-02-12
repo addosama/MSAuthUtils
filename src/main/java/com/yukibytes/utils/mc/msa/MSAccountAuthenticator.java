@@ -31,7 +31,7 @@ public class MSAccountAuthenticator {
     public CompletableFuture<MSAccountData> authenticate() throws IOException {
         authFuture = new CompletableFuture<>();
         startCallbackServer();
-        openAuthPage();
+        openAuthPage(true);
         return authFuture;
     }
 
@@ -43,7 +43,7 @@ public class MSAccountAuthenticator {
             JSONObject tokenResponse = postRequest(
                     MSAuthConfig.TOKEN_URL,
                     "client_id=" + config.getClientId() +
-                            "&client_secret=" + config.getEncodedSecret() +
+//                            "&client_secret=" + config.getEncodedSecret() +
                             "&refresh_token=" + refreshToken +
                             "&grant_type=refresh_token"
             );
@@ -227,7 +227,7 @@ public class MSAccountAuthenticator {
     }
 
     // 打开认证页面
-    private void openAuthPage() throws IOException {
+    private void openAuthPage(boolean selectAcc) throws IOException {
         String authUrl = MSAuthConfig.MICROSOFT_AUTH_URL + "?" +
                 "client_id=" + config.getClientId() +
                 "&response_type=code" +
@@ -236,7 +236,7 @@ public class MSAccountAuthenticator {
                 "&code_challenge=" + codeChallenge +
                 "&code_challenge_method=S256" +
                 "&response_mode=query" +
-                "&prompt=select_account";
+                (selectAcc ? "&prompt=select_account" : "");
 
         Desktop.getDesktop().browse(URI.create(authUrl));
     }

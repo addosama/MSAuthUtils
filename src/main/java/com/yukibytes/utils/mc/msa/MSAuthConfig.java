@@ -1,9 +1,5 @@
 package com.yukibytes.utils.mc.msa;
 
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
-
 /**
  * 微软认证配置类 - 存储全局常量
  * Copyright (c) 2024 Deepseek-V3
@@ -11,7 +7,6 @@ import java.nio.charset.StandardCharsets;
 public class MSAuthConfig {
     // 应用注册信息
     private final String clientId;
-    private final String clientSecret;
     private final int callbackPort;
 
     // 固定API端点
@@ -22,9 +17,8 @@ public class MSAuthConfig {
     public static final String MINECRAFT_AUTH_URL = "https://api.minecraftservices.com/authentication/login_with_xbox";
     public static final String PROFILE_URL = "https://api.minecraftservices.com/minecraft/profile";
 
-    public MSAuthConfig(String clientId, String clientSecret, int callbackPort) {
+    public MSAuthConfig(String clientId, int callbackPort) {
         this.clientId = clientId;
-        this.clientSecret = clientSecret;
         this.callbackPort = callbackPort;
     }
 
@@ -32,9 +26,6 @@ public class MSAuthConfig {
     public String getClientId() { return clientId; }
     public String getRedirectUri() {
         return URLEncodeUtils.utf8("http://localhost:" + callbackPort + "/auth");
-    }
-    public String getEncodedSecret() {
-        return URLEncodeUtils.utf8(clientSecret);
     }
     public int getCallbackPort() {
         return callbackPort;

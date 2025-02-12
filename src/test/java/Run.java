@@ -17,11 +17,13 @@ public class Run {
     public static void main(String[] args) {
         try {
             JSONObject res = ((JSONObject) new JSONTokener(new FileReader(new File("D:/@Addo6544/str.json"))).nextValue()).getJSONObject("YukiMCL");
-            MSAccountData a = new MSAccountAuthenticator(new MSAuthConfig(
+            MSAuthConfig c = new MSAuthConfig(
                     res.getString("client_id"),
-                    res.getString("secret_key"),
                     res.getInt("port")
-            )).authenticate().get();
+            );
+            MSAccountData a = new MSAccountAuthenticator(c).authenticate().get();
+            System.out.println("==============================");
+            MSAccountData b = new MSAccountAuthenticator(c).refreshLogin(a.getRefreshToken()).get();
             System.out.println(a.getUsername());
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
