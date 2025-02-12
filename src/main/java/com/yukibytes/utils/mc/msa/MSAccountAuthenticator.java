@@ -21,6 +21,8 @@ public class MSAccountAuthenticator {
     private final String codeVerifier;
     private final String codeChallenge;
 
+    private HttpServer callbackServer;
+
     public MSAccountAuthenticator(MSAuthConfig config) {
         this.config = config;
         this.codeVerifier = PKCEUtils.generateCodeVerifier();
@@ -30,9 +32,22 @@ public class MSAccountAuthenticator {
     // 全新登录流程
     public CompletableFuture<MSAccountData> authenticate() throws IOException {
         authFuture = new CompletableFuture<>();
+        final boolean[] isTimeout = { false };
         startCallbackServer();
         openAuthPage(true);
+
         return authFuture;
+    }
+
+    public void cancelAuthentication() {
+        if (authFuture != null && !authFuture.isDone()) {
+            authFuture.cancel(true); // 中断登录流程
+            System.out.println("登录已取消。");
+        }
+        if (callbackServer != null) {
+            callbackServer.stop(0); // 停止回调服务器
+            callbackServer = null;
+        }
     }
 
     // 通过refreshToken重新登录
@@ -201,13 +216,13 @@ public class MSAccountAuthenticator {
 
     // 启动回调服务器
     private void startCallbackServer() throws IOException {
-        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", config.getCallbackPort()), 0);
+        this.callbackServer = HttpServer.create(new InetSocketAddress("127.0.0.1", config.getCallbackPort()), 0);
 
 //        System.out.println(server.getAddress().toString());
 //        System.out.println(server.getAddress().getHostName());
 //        System.out.println(server.getAddress().getHostString());
 
-        server.createContext("/auth", exchange -> {
+        callbackServer.createContext("/auth", exchange -> {
             try {
                 Map<String, String> params = parseQueryParams(exchange.getRequestURI().getQuery());
                 if (params.containsKey("code")) {
@@ -220,10 +235,10 @@ public class MSAccountAuthenticator {
                     sendErrorResponse(exchange, "Authentication failed - Unknown Error");
                 }
             } finally {
-                server.stop(0);
+                callbackServer.stop(0);
             }
         });
-        server.start();
+        callbackServer.start();
     }
 
     // 打开认证页面

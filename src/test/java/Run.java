@@ -7,7 +7,11 @@ import org.json.JSONTokener;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.Timer;
+import java.util.TimerTask;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 
 /**
  * @author addo6544
@@ -21,10 +25,11 @@ public class Run {
                     res.getString("client_id"),
                     res.getInt("port")
             );
-            MSAccountData a = new MSAccountAuthenticator(c).authenticate().get();
+            MSAccountAuthenticator A = new MSAccountAuthenticator(c);
+            MSAccountData acc = A.authenticate().get();
             System.out.println("==============================");
-            MSAccountData b = new MSAccountAuthenticator(c).refreshLogin(a.getRefreshToken()).get();
-            System.out.println(a.getUsername());
+            //MSAccountData b = new MSAccountAuthenticator(c).refreshLogin(a.getRefreshToken()).get();
+            System.out.println(acc.getUsername());
         } catch (InterruptedException e) {
             throw new RuntimeException(e);
         } catch (ExecutionException e) {
