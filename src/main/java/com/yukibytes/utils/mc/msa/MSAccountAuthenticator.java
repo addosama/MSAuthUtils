@@ -22,19 +22,37 @@ public class MSAccountAuthenticator {
     private final String codeChallenge;
 
     private HttpServer callbackServer;
+    //线程池
+    private ExecutorService executorService;
+    private ScheduledExecutorService timeoutExecutor;
 
     public MSAccountAuthenticator(MSAuthConfig config) {
         this.config = config;
         this.codeVerifier = PKCEUtils.generateCodeVerifier();
         this.codeChallenge = PKCEUtils.generateCodeChallenge(codeVerifier);
+        this.executorService = Executors.newSingleThreadExecutor();
+        this.timeoutExecutor = Executors.newScheduledThreadPool(1);
     }
 
     // 全新登录流程
-    public CompletableFuture<MSAccountData> authenticate() throws IOException {
+    public CompletableFuture<MSAccountData> authenticate(long timeout, TimeUnit timeUnit) throws IOException {
         authFuture = new CompletableFuture<>();
-        final boolean[] isTimeout = { false };
-        startCallbackServer();
-        openAuthPage(true);
+
+        executorService.submit(() -> {
+            try {
+                startCallbackServer();
+                openAuthPage(true);
+            } catch (IOException e) {
+                authFuture.completeExceptionally(e);
+            }
+        });
+
+        timeoutExecutor.schedule(() -> {
+            if (!authFuture.isDone()) {
+                authFuture.completeExceptionally(new TimeoutException("登录超时，请重试。"));
+                cancelAuthentication(); // 取消登录
+            }
+        }, timeout, timeUnit);
 
         return authFuture;
     }
@@ -314,6 +332,15 @@ public class MSAccountAuthenticator {
         exchange.sendResponseHeaders(400, response.getBytes().length);
         try (OutputStream os = exchange.getResponseBody()) {
             os.write(response.getBytes());
+        }
+    }
+
+    private void shutdown() {
+        if (executorService != null) {
+            executorService.shutdown();
+        }
+        if (timeoutExecutor != null) {
+            timeoutExecutor.shutdown();
         }
     }
 }
