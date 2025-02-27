@@ -335,7 +335,7 @@ public class MSAccountAuthenticator {
         }
     }
 
-    private void shutdown() {
+    public void shutdown() {
         if (executorService != null) {
             executorService.shutdown();
         }
