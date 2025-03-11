@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * 账户认证处理器 - 每个账户实例独立使用
@@ -34,9 +35,14 @@ public class MSAccountAuthenticator {
         this.timeoutExecutor = Executors.newScheduledThreadPool(1);
     }
 
+    public CompletableFuture<MSAccountData> authenticate() throws TimeoutException {
+        return authenticate(5, TimeUnit.MINUTES);
+    }
+
     // 全新登录流程
-    public CompletableFuture<MSAccountData> authenticate(long timeout, TimeUnit timeUnit) throws IOException {
+    public CompletableFuture<MSAccountData> authenticate(long timeout, TimeUnit timeUnit) throws TimeoutException {
         authFuture = new CompletableFuture<>();
+        AtomicBoolean isTimeout = new AtomicBoolean(false);
 
         executorService.submit(() -> {
             try {
@@ -51,8 +57,13 @@ public class MSAccountAuthenticator {
             if (!authFuture.isDone()) {
                 authFuture.completeExceptionally(new TimeoutException("登录超时，请重试。"));
                 cancelAuthentication(); // 取消登录
+                isTimeout.set(true);
             }
         }, timeout, timeUnit);
+
+        if (isTimeout.get()) {
+            throw new TimeoutException();
+        }
 
         return authFuture;
     }
@@ -69,24 +80,42 @@ public class MSAccountAuthenticator {
     }
 
     // 通过refreshToken重新登录
-    public CompletableFuture<MSAccountData> refreshLogin(String refreshToken) {
+    public CompletableFuture<MSAccountData> refreshLogin(String refreshToken, long timeout, TimeUnit timeUnit) throws TimeoutException{
         CompletableFuture<MSAccountData> future = new CompletableFuture<>();
 
-        try {
-            JSONObject tokenResponse = postRequest(
-                    MSAuthConfig.TOKEN_URL,
-                    "client_id=" + config.getClientId() +
-//                            "&client_secret=" + config.getEncodedSecret() +
-                            "&refresh_token=" + refreshToken +
-                            "&grant_type=refresh_token"
-            );
+        AtomicBoolean isTimeout = new AtomicBoolean(false);
 
-            processTokenResponse(tokenResponse, future);
-        } catch (Exception e) {
-            future.completeExceptionally(e);
-        }
+        executorService.submit(() -> {
+            try {
+                JSONObject tokenResponse = postRequest(
+                        MSAuthConfig.TOKEN_URL,
+                        "client_id=" + config.getClientId() +
+//                            "&client_secret=" + config.getEncodedSecret() +
+                                "&refresh_token=" + refreshToken +
+                                "&grant_type=refresh_token"
+                );
+
+                processTokenResponse(tokenResponse, future);
+            } catch (Exception e) {
+                future.completeExceptionally(e);
+            }
+        });
+
+        timeoutExecutor.schedule(() -> {
+            if (!future.isDone()) {
+                authFuture.completeExceptionally(new TimeoutException("登录超时，请重试。"));
+                cancelAuthentication(); // 取消登录
+                isTimeout.set(true);
+            }
+        }, timeout, timeUnit);
+
+        if (isTimeout.get()) throw new TimeoutException();
 
         return future;
+    }
+
+    public CompletableFuture<MSAccountData> refreshLogin(String refreshToken) throws TimeoutException {
+        return refreshLogin(refreshToken, 30, TimeUnit.SECONDS);
     }
 
     // 处理令牌响应
